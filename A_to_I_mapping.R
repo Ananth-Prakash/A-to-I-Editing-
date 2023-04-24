@@ -52,8 +52,8 @@ ggplot(data = filtered_editing_sites, aes(x = nSamples)) +
 
 if ( !exists("FASTA_TYPE")) warning("Please specify experiment type variable: FASTA_TYPE")
 ## Specify experiment type, i.e. what type of quantification is used, MS1-based or MS2-based. As a rule of thumb, label free and SILAC is MS1-based, and iTRAQ and TMT is MS2-based.
-FASTA_TYPE <- "Protein"
-#FASTA_TYPE <- "Peptide"
+#FASTA_TYPE <- "Protein"
+FASTA_TYPE <- "Peptide"
 
 
 #Read UniProt FASTA file
