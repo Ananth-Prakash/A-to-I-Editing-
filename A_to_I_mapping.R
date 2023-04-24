@@ -52,8 +52,8 @@ ggplot(data = filtered_editing_sites, aes(x = nSamples)) +
 
 if ( !exists("FASTA_TYPE")) warning("Please specify experiment type variable: FASTA_TYPE")
 ## Specify experiment type, i.e. what type of quantification is used, MS1-based or MS2-based. As a rule of thumb, label free and SILAC is MS1-based, and iTRAQ and TMT is MS2-based.
-#FASTA_TYPE <- "Protein"
-FASTA_TYPE <- "Peptide"
+FASTA_TYPE <- "Protein"
+#FASTA_TYPE <- "Peptide"
 
 
 #Read UniProt FASTA file
@@ -172,8 +172,6 @@ for(l in 1:nrow(All_peptide_fragments_filtered)){
 
 All_peptide_fragments_filtered$edited[is.na(All_peptide_fragments_filtered$edited)] <- "N"
 All_peptide_fragments_filtered$all_edit_sites <- gsub("^,","",All_peptide_fragments_filtered$all_edit_sites)
-All_peptide_fragments_filtered$number_of_edited_sites <- lengths(strsplit(as.character(All_peptide_fragments_filtered$all_edit_sites), ","))
-All_peptide_fragments_filtered$number_of_edited_sites[is.na(All_peptide_fragments_filtered$all_edit_sites)] <- NA
 ##################################################################################################
 #### Make different versions of peptide fragments based on combinations of edited positions ######
 ##################################################################################################
@@ -192,7 +190,7 @@ generate_seq_comb <- function(seq,edited_seq){
   edit_peptide_pos <- unlist(gregexpr("[[:lower:]]",edited_seq))
   no_of_edits <- length(edit_peptide_pos)
   edit_aa <- data.frame()
-  output <- data.frame(edited_peptide_pos=c("NA"), edited_peptide_frag=c("NA"))
+  output <- data.frame(edited_peptide_pos=c(NA), edited_peptide_frag=c(NA))
   
   #print(edit_aa)
   #print(edit_peptide_pos)
@@ -204,7 +202,7 @@ generate_seq_comb <- function(seq,edited_seq){
   
   for(n in 1:nrow(edit_pos_combinations)){
     new_seq_comb <- seq
-    aa_position<-"NA"
+    aa_position<-NA
     output[n,"edited_peptide_pos"] <- aa_position
     output[n,"edited_peptide_frag"] <- new_seq_comb
     for(m in 1:ncol(edit_pos_combinations)){
@@ -242,6 +240,9 @@ for(a in 1:nrow(Only_edited_fragments)){
 }
 
 All_edited_fragment_versions <- do.call(rbind, res)
+All_edited_fragment_versions$number_of_edited_sites <- lengths(strsplit(as.character(All_edited_fragment_versions$edited_peptide_pos), ","))
+All_edited_fragment_versions$number_of_edited_sites[is.na(All_edited_fragment_versions$edited_peptide_pos)] <- NA
+
 Non_edited_fragments$"edited_peptide_pos" <- NA
 Non_edited_fragments$"edited_peptide_frag" <- Non_edited_fragments$frag
 
@@ -277,13 +278,19 @@ All_data <- All_data[order(All_data$peptide_id),]
 #All_peptide_fragments_filtered <- All_peptide_fragments_filtered[with(All_peptide_fragments_filtered, order(UniProt,start_cord)), ]
 #colnames(All_peptide_fragments_filtered)[4] <- "fragment_with_2_missed_cleavage_sites"
 
-write.table(All_data, file = "output_A_to_I_edited_peptide_fragments_table.txt", sep = "\t", row.names = FALSE, quote = FALSE )
+if(FASTA_TYPE == "Protein"){
+  write.table(All_data, file = "output_A_to_I_edited_FULL_Length_Proteins_TABLE.txt", sep = "\t", row.names = FALSE, quote = FALSE )} else {
+    write.table(All_data, file = "output_A_to_I_edited_Peptide_Fragments_TABLE.txt", sep = "\t", row.names = FALSE, quote = FALSE )
+  }
 
 
 output_fasta <- All_data
 output_fasta$edited_peptide_fragment <- toupper(output_fasta$edited_peptide_fragment)
 output_fasta$FASTA <- paste0(">",output_fasta$peptide_id,"\n",output_fasta$edited_peptide_fragment)
 
-write.table(output_fasta$FASTA, file = "output_A_to_I_editing_FASTA.txt", sep = "\t", row.names = FALSE, col.names = FALSE, quote = FALSE )
+if(FASTA_TYPE == "Protein"){
+  write.table(output_fasta$FASTA, file = "output_A_to_I_edited_FULL_Length_Proteins_FASTA.txt", sep = "\t", row.names = FALSE, col.names = FALSE, quote = FALSE )} else {
+    write.table(output_fasta$FASTA, file = "output_A_to_I_edited_Peptide_Fragments_FASTA.txt", sep = "\t", row.names = FALSE, col.names = FALSE, quote = FALSE )
+  }
 
 
