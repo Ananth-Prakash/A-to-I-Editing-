@@ -49,9 +49,16 @@ ggplot(data = filtered_editing_sites, aes(x = nSamples)) +
   theme_bw()+
   ggtitle("Rediportal: A to I sites in number of samples")
 
+
+if ( !exists("FASTA_TYPE")) warning("Please specify experiment type variable: FASTA_TYPE")
+## Specify experiment type, i.e. what type of quantification is used, MS1-based or MS2-based. As a rule of thumb, label free and SILAC is MS1-based, and iTRAQ and TMT is MS2-based.
+FASTA_TYPE <- "Protein"
+#FASTA_TYPE <- "Peptide"
+
+
 #Read UniProt FASTA file
-fasta_file <- readAAStringSet("Human_OneProteinPerGeneSet_Sept2020_UP000005640_9606.fasta")
-#fasta_file <- readAAStringSet("TEST3_input.fasta")
+#fasta_file <- readAAStringSet("Human_OneProteinPerGeneSet_Sept2020_UP000005640_9606.fasta")
+fasta_file <- readAAStringSet("TEST4_input.fasta")
 
 fasta_seq <- as.data.frame(fasta_file)
 fasta_seq <- tibble::rownames_to_column(fasta_seq, "name")
@@ -80,9 +87,19 @@ for(i in 1:nrow(fasta_seq)){
   tmp <- setNames(data.frame(matrix(ncol = 5, nrow = 0)), c("peptide_id","frag", "start_cord", "end_cord","pept_len"))
   #print(seq_id)
   
-  #extract peptide fragments including 2 missed Trypsin cleavage sites
-  # protein has at least 3 trypsin cleavage sites
-  if(nrow(seq_frag_coords) > 4){
+  if(FASTA_TYPE == "Protein"){
+    #For full-length protein
+    tmp[1,"peptide_id"] <- seq_id
+    tmp[1,"frag"] <- seq
+    tmp[1,"start_cord"] <- 1
+    tmp[1,"end_cord"] <- seq_length
+    tmp[1,"pept_len"] <- seq_length
+  }
+  
+  if(FASTA_TYPE == "Peptide"){
+    #extract peptide fragments including 2 missed Trypsin cleavage sites
+    # protein has at least 3 trypsin cleavage sites
+    if(nrow(seq_frag_coords) > 4){
       for(j in 1:(nrow(seq_frag_coords)-3)){
         tmp[j,"peptide_id"] <- paste0(seq_id,"|Peptide_",j)
         tmp[j,"frag"] <- letter(seq, (seq_frag_coords[j,1]+1):seq_frag_coords[j+3,1])
@@ -90,18 +107,20 @@ for(i in 1:nrow(fasta_seq)){
         tmp[j,"end_cord"] <- seq_frag_coords[j+3,1]
         tmp[j,"pept_len"] <- seq_frag_coords[j+3,1]-(seq_frag_coords[j,1]+1)+1 
       }
-  }
-  # protein has maximum 2 trypsin cleavage sites
-  if(nrow(seq_frag_coords) <= 4){
-    tmp[1,"peptide_id"] <- paste0(seq_id,"|Peptide_",1)
-    tmp$frag <- seq
-    tmp$start_cord <- seq_frag_coords[1,1]+1
-    tmp$end_cord <- seq_frag_coords[nrow(seq_frag_coords),1]
-    tmp$pept_len <- tmp$end_cord-(tmp$start_cord)+1 
+    }
+    # protein has maximum 2 trypsin cleavage sites
+    if(nrow(seq_frag_coords) <= 4){
+      tmp[1,"peptide_id"] <- paste0(seq_id,"|Peptide_",1)
+      tmp$frag <- seq
+      tmp$start_cord <- seq_frag_coords[1,1]+1
+      tmp$end_cord <- seq_frag_coords[nrow(seq_frag_coords),1]
+      tmp$pept_len <- tmp$end_cord-(tmp$start_cord)+1 
+    }
   }
   fragments[[i]] <- tmp
   print(paste0("Looking for Trypsin cleavage sites... ", as.character(round(i*100/nrow(fasta_seq),1)),"%"))
 }
+
 All_peptide_fragments <- do.call(rbind, fragments)
 All_peptide_fragments_filtered <- All_peptide_fragments[All_peptide_fragments$pept_len >=7,]
 All_peptide_fragments_filtered$UniProt <- All_peptide_fragments_filtered[,c("peptide_id")]
@@ -134,16 +153,16 @@ for(l in 1:nrow(All_peptide_fragments_filtered)){
       editing_sites_edited_residue <- edit_sites_subset[k,c("Single_varAAcode")]
       editing_sites_nsamples <- edit_sites_subset[k,c("nSamples")]
       editing_sites_ntissues <- edit_sites_subset[k,c("nTissues")]
-
-        # check if editing site falls inbetween fragment peptide
-        if( (editing_sites_edited_position >= fragment_start_pos) && (editing_sites_edited_position <= fragment_stop_pos) ){
-          # calculate aa replacement position on fragment peptide and replace with AtoI aa as in rediportal
-          offset <- (editing_sites_edited_position - fragment_start_pos) + 1
-          substr(All_peptide_fragments_filtered[l,c("edited_frag")], offset, offset) <- tolower(editing_sites_edited_residue)
-
-          all_edited_sites <- paste(all_edited_sites, editing_sites_edited_position, sep=",")
-          All_peptide_fragments_filtered[l,c("all_edit_sites")] <- all_edited_sites 
-          All_peptide_fragments_filtered[l,c("edited")] <- "Y"
+      
+      # check if editing site falls inbetween fragment peptide
+      if( (editing_sites_edited_position >= fragment_start_pos) && (editing_sites_edited_position <= fragment_stop_pos) ){
+        # calculate aa replacement position on fragment peptide and replace with AtoI aa as in rediportal
+        offset <- (editing_sites_edited_position - fragment_start_pos) + 1
+        substr(All_peptide_fragments_filtered[l,c("edited_frag")], offset, offset) <- tolower(editing_sites_edited_residue)
+        
+        all_edited_sites <- paste(all_edited_sites, editing_sites_edited_position, sep=",")
+        All_peptide_fragments_filtered[l,c("all_edit_sites")] <- all_edited_sites 
+        All_peptide_fragments_filtered[l,c("edited")] <- "Y"
       }
     }
   }
@@ -153,7 +172,8 @@ for(l in 1:nrow(All_peptide_fragments_filtered)){
 
 All_peptide_fragments_filtered$edited[is.na(All_peptide_fragments_filtered$edited)] <- "N"
 All_peptide_fragments_filtered$all_edit_sites <- gsub("^,","",All_peptide_fragments_filtered$all_edit_sites)
-#All_peptide_fragments_filtered$number_of_edited_sites <- lengths(strsplit(as.character(All_peptide_fragments_filtered$all_edited_sites), ","))
+All_peptide_fragments_filtered$number_of_edited_sites <- lengths(strsplit(as.character(All_peptide_fragments_filtered$all_edit_sites), ","))
+All_peptide_fragments_filtered$number_of_edited_sites[is.na(All_peptide_fragments_filtered$all_edit_sites)] <- NA
 ##################################################################################################
 #### Make different versions of peptide fragments based on combinations of edited positions ######
 ##################################################################################################
@@ -173,7 +193,7 @@ generate_seq_comb <- function(seq,edited_seq){
   no_of_edits <- length(edit_peptide_pos)
   edit_aa <- data.frame()
   output <- data.frame(edited_peptide_pos=c("NA"), edited_peptide_frag=c("NA"))
-
+  
   #print(edit_aa)
   #print(edit_peptide_pos)
   edit_pos_combinations <- expand.grid(rep(list(0:1), no_of_edits))
@@ -212,6 +232,7 @@ for(a in 1:nrow(Only_edited_fragments)){
   edited_seq <- Only_edited_fragments[a,c("edited_frag")]
   frag_variations <- generate_seq_comb(seq, edited_seq)
   inpdata <- Only_edited_fragments[a,]
+  
   #attach seq combinations to the orig. dataframe (by duplicating the orig. frame)
   combined <- cbind(inpdata, frag_variations)
   
@@ -248,8 +269,8 @@ All_data$peptide_id <- do.call(paste, c(All_data[c("peptide_id","edit_position_o
 
 Accessions <- unique(filtered_editing_sites[,c("GeneName","UniProt")])
 All_data <- merge(x=Accessions, y=All_data,
-             by.x=c("UniProt"), by.y=c("UniProt"),
-             all.x=FALSE, all.y=TRUE)
+                  by.x=c("UniProt"), by.y=c("UniProt"),
+                  all.x=FALSE, all.y=TRUE)
 
 All_data <- All_data[order(All_data$peptide_id),]
 
@@ -266,4 +287,3 @@ output_fasta$FASTA <- paste0(">",output_fasta$peptide_id,"\n",output_fasta$edite
 write.table(output_fasta$FASTA, file = "output_A_to_I_editing_FASTA.txt", sep = "\t", row.names = FALSE, col.names = FALSE, quote = FALSE )
 
 
-  
