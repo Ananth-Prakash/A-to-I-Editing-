@@ -229,11 +229,6 @@ All_peptide_fragments_filtered$all_edit_sites <- gsub("^,","",All_peptide_fragme
 Only_edited_fragments <- All_peptide_fragments_filtered[All_peptide_fragments_filtered$edited == "Y",]
 Non_edited_fragments <- All_peptide_fragments_filtered[All_peptide_fragments_filtered$edited == "N",]
 
-#different versions also include un-edited version of fragment
-### Use expand.grid() function?
-# https://stackoverflow.com/questions/18705153/generate-list-of-all-possible-combinations-of-elements-of-vector
-
-
 # Get only number of all possible edit sites variations in a peptide ---- 
 
 if(FASTA_TYPE == "Peptide"){
@@ -253,6 +248,10 @@ ggplot(data = Number_of_peptide_fragment_variations, aes(x = number_of_edited_si
 }
 
 # Generate edited peptide fragments versions ---- 
+# different versions also include un-edited version of fragment
+# ## Use expand.grid() function?
+# https://stackoverflow.com/questions/18705153/generate-list-of-all-possible-combinations-of-elements-of-vector
+
 edited_fragment_versions <- list()
 generate_seq_comb <- function(seq,edited_seq){
   
