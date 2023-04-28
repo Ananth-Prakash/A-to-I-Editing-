@@ -208,8 +208,8 @@ for(l in 1:nrow(All_peptide_fragments_filtered)){
         all_edited_sites <- paste(all_edited_sites, editing_sites_edited_position, sep=",")
         All_peptide_fragments_filtered[l,c("all_edit_sites")] <- all_edited_sites 
         All_peptide_fragments_filtered[l,c("edited")] <- "Y"
-        Only_edited_fragments[l,c("nSamples")] <- editing_sites_nsamples 
-        Only_edited_fragments[l,c("nTissues")] <- editing_sites_ntissues
+        All_peptide_fragments_filtered[l,c("nSamples")] <- editing_sites_nsamples 
+        All_peptide_fragments_filtered[l,c("nTissues")] <- editing_sites_ntissues
       }
     }
   }
