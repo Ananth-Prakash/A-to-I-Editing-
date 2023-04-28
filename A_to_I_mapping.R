@@ -54,7 +54,7 @@ ggplot(data = filtered_editing_sites, aes(x = nSamples)) +
 #B:check the distribution of number of edit sites per protein in dataset filtered based on synonymous
 synfiltered_editsite_distribution <- filtered_editing_sites %>% count(UniProt, sort = TRUE)
 #C:as well as fiktered after removig evidence based on sample number cutoff (B+C)
-sample_filtered_editing_sites <- filtered_editing_sites[filtered_editing_sites$nSamples >= 50,]
+sample_filtered_editing_sites <- filtered_editing_sites[filtered_editing_sites$nSamples >= 10,]
 samplefiltered_editsite_distribution <- sample_filtered_editing_sites %>% count(UniProt, sort = TRUE)
 
 ggplot(data = synfiltered_editsite_distribution , aes(x = n)) +
@@ -75,7 +75,7 @@ ggplot(data = samplefiltered_editsite_distribution , aes(x = n)) +
   xlab("Number of AtoI edit sites in each protein")+
   ylab("Number of proteins")+
   theme_bw()+
-  ggtitle("Rediportal: number of A to I sites in each protein\n(filter: remove synonymous sites + found in samples >= 50)")
+  ggtitle("Rediportal: number of A to I sites in each protein\n(filter: remove synonymous sites + found in samples >= 10)")
 
 if ( !exists("FASTA_TYPE")) warning("Please specify experiment type variable: FASTA_TYPE")
 ## Specify experiment type, i.e. what type of quantification is used, MS1-based or MS2-based. As a rule of thumb, label free and SILAC is MS1-based, and iTRAQ and TMT is MS2-based.
@@ -150,6 +150,7 @@ for(i in 1:nrow(fasta_seq)){
 
 All_peptide_fragments <- do.call(rbind, fragments)
 
+# Distribution of peptide fragment lengths
 if(FASTA_TYPE == "Peptide"){
   median_peptlength <- median(All_peptide_fragments$pept_len)
   ggplot(data = All_peptide_fragments , aes(x = pept_len)) +
@@ -241,14 +242,14 @@ Number_of_peptide_fragment_variations$number_of_edited_sites <- sapply(strsplit(
 
 write.table(Number_of_peptide_fragment_variations, file = "ForPlot-number_of_peptide_fragment_variations.txt", sep = "\t", row.names = FALSE, quote = FALSE )
 
-ggplot(data = Number_of_peptide_fragment_variations[Number_of_peptide_fragment_variations$nSamples >= 50,] , aes(x = number_of_edited_sites)) +
+ggplot(data = Number_of_peptide_fragment_variations, aes(x = number_of_edited_sites)) +
   geom_histogram(color = "white", fill = "black")+
   #scale_x_log10()+
   scale_y_log10()+
   xlab("Number of AtoI edit sites in each peptide")+
   ylab("Number of peptides")+
   theme_bw()+
-  ggtitle("Rediportal: number of A to I sites in each peptide fragment\n(filter: remove synonymous sites + found in samples >= 50)")
+  ggtitle("Rediportal: number of A to I sites in each peptide fragment\n(filter: remove synonymous sites)")
 }
 
 # Generate edited peptide fragments versions ---- 
@@ -344,9 +345,6 @@ All_data <- merge(x=Accessions, y=All_data,
                   all.x=FALSE, all.y=TRUE)
 
 All_data <- All_data[order(All_data$peptide_id),]
-
-#All_peptide_fragments_filtered <- All_peptide_fragments_filtered[with(All_peptide_fragments_filtered, order(UniProt,start_cord)), ]
-#colnames(All_peptide_fragments_filtered)[4] <- "fragment_with_2_missed_cleavage_sites"
 
 if(FASTA_TYPE == "Protein"){
   write.table(All_data, file = "output_A_to_I_edited_FULL_Length_Proteins_TABLE.txt", sep = "\t", row.names = FALSE, quote = FALSE )} else {
