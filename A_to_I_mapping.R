@@ -8,6 +8,7 @@ library("Biostrings")
 library("dplyr")
 library("stringr")
 library("ggplot2")
+library("data.table")
 
 setwd('/Users/ananth/Documents/A_To_I_Editing/')
 
@@ -40,6 +41,7 @@ all_editing_sites$Single_varAAcode <- gsub("Val","V",all_editing_sites$Single_va
 filtered_editing_sites <- all_editing_sites[all_editing_sites$Consequence != "synonymous",]
 filtered_editing_sites <- filtered_editing_sites[with(filtered_editing_sites, order(UniProt,IsoformPosition)), ]
 
+#A:check distribution of number of samples
 median_nSamples <- median(filtered_editing_sites$nSamples)
 
 ggplot(data = filtered_editing_sites, aes(x = nSamples)) +
@@ -49,6 +51,31 @@ ggplot(data = filtered_editing_sites, aes(x = nSamples)) +
   theme_bw()+
   ggtitle("Rediportal: A to I sites in number of samples")
 
+#B:check the distribution of number of edit sites per protein in dataset filtered based on synonymous
+synfiltered_editsite_distribution <- filtered_editing_sites %>% count(UniProt, sort = TRUE)
+#C:as well as fiktered after removig evidence based on sample number cutoff (B+C)
+sample_filtered_editing_sites <- filtered_editing_sites[filtered_editing_sites$nSamples >= 50,]
+samplefiltered_editsite_distribution <- sample_filtered_editing_sites %>% count(UniProt, sort = TRUE)
+
+ggplot(data = synfiltered_editsite_distribution , aes(x = n)) +
+  geom_histogram(color = "white", fill = "lightgreen")+
+  #geom_histogram(color = "white", fill = "lightgreen", binwidth = 1)+
+  #scale_x_log10()+
+  scale_y_log10()+
+  xlab("Number of AtoI edit sites in each protein")+
+  ylab("Number of proteins")+
+  theme_bw()+
+  ggtitle("Rediportal: number of A to I sites in each protein\n(filter: remove synonymous sites)")
+
+ggplot(data = samplefiltered_editsite_distribution , aes(x = n)) +
+  geom_histogram(color = "white", fill = "brown")+
+  #geom_histogram(color = "white", fill = "brown", binwidth = 1)+
+  #scale_x_log10()+
+  scale_y_log10()+
+  xlab("Number of AtoI edit sites in each protein")+
+  ylab("Number of proteins")+
+  theme_bw()+
+  ggtitle("Rediportal: number of A to I sites in each protein\n(filter: remove synonymous sites + found in samples >= 50)")
 
 if ( !exists("FASTA_TYPE")) warning("Please specify experiment type variable: FASTA_TYPE")
 ## Specify experiment type, i.e. what type of quantification is used, MS1-based or MS2-based. As a rule of thumb, label free and SILAC is MS1-based, and iTRAQ and TMT is MS2-based.
@@ -58,7 +85,7 @@ FASTA_TYPE <- "Peptide"
 
 #Read UniProt FASTA file
 fasta_file <- readAAStringSet("Human_OneProteinPerGeneSet_Sept2020_UP000005640_9606.fasta")
-#fasta_file <- readAAStringSet("TEST4_input.fasta")
+#fasta_file <- readAAStringSet("TEST5_input.fasta")
 
 fasta_seq <- as.data.frame(fasta_file)
 fasta_seq <- tibble::rownames_to_column(fasta_seq, "name")
@@ -122,13 +149,31 @@ for(i in 1:nrow(fasta_seq)){
 }
 
 All_peptide_fragments <- do.call(rbind, fragments)
-All_peptide_fragments_filtered <- All_peptide_fragments[All_peptide_fragments$pept_len >=7,]
+
+if(FASTA_TYPE == "Peptide"){
+  median_peptlength <- median(All_peptide_fragments$pept_len)
+  ggplot(data = All_peptide_fragments , aes(x = pept_len)) +
+    geom_histogram(color = "white", fill = "lightpink")+
+    geom_vline(aes(xintercept = median_peptlength), color = "red", linewidth = 2)+
+    scale_x_log10()+
+    #scale_y_log10()+
+    xlab("peptide fragment length")+
+    ylab("Number of peptides")+
+    theme_bw()+
+    ggtitle("Peptide length distribution")
+}
+# Limit peptide fragment length to between 7 and 60 amino acids
+#All_peptide_fragments_filtered <- All_peptide_fragments[All_peptide_fragments$pept_len >=7,]
+All_peptide_fragments_filtered <- All_peptide_fragments[(All_peptide_fragments$pept_len >=7 & All_peptide_fragments$pept_len <= 60),]
+
 All_peptide_fragments_filtered$UniProt <- All_peptide_fragments_filtered[,c("peptide_id")]
 All_peptide_fragments_filtered$UniProt <- gsub("^tr\\||^sp\\|","",All_peptide_fragments_filtered$UniProt, perl=TRUE)
 All_peptide_fragments_filtered$UniProt <- gsub("\\|.*","",All_peptide_fragments_filtered$UniProt, perl=TRUE)
 All_peptide_fragments_filtered$edited  <- NA #Y or N
 All_peptide_fragments_filtered$number_of_edited_sites <- NA
 All_peptide_fragments_filtered$all_edit_sites <- NA
+All_peptide_fragments_filtered$nSamples  <- NA
+All_peptide_fragments_filtered$nTissues  <- NA
 All_peptide_fragments_filtered$edited_frag <- All_peptide_fragments_filtered$frag #show edited aa in lower case?
 
 
@@ -163,6 +208,8 @@ for(l in 1:nrow(All_peptide_fragments_filtered)){
         all_edited_sites <- paste(all_edited_sites, editing_sites_edited_position, sep=",")
         All_peptide_fragments_filtered[l,c("all_edit_sites")] <- all_edited_sites 
         All_peptide_fragments_filtered[l,c("edited")] <- "Y"
+        Only_edited_fragments[l,c("nSamples")] <- editing_sites_nsamples 
+        Only_edited_fragments[l,c("nTissues")] <- editing_sites_ntissues
       }
     }
   }
@@ -172,6 +219,8 @@ for(l in 1:nrow(All_peptide_fragments_filtered)){
 
 All_peptide_fragments_filtered$edited[is.na(All_peptide_fragments_filtered$edited)] <- "N"
 All_peptide_fragments_filtered$all_edit_sites <- gsub("^,","",All_peptide_fragments_filtered$all_edit_sites)
+
+
 ##################################################################################################
 #### Make different versions of peptide fragments based on combinations of edited positions ######
 ##################################################################################################
@@ -183,8 +232,27 @@ Non_edited_fragments <- All_peptide_fragments_filtered[All_peptide_fragments_fil
 ### Use expand.grid() function?
 # https://stackoverflow.com/questions/18705153/generate-list-of-all-possible-combinations-of-elements-of-vector
 
-edited_fragment_versions <- list()
+
+# Get only number of all possible edit sites variations in a peptide ---- 
+
+if(FASTA_TYPE == "Peptide"){
+Number_of_peptide_fragment_variations <- Only_edited_fragments
+Number_of_peptide_fragment_variations$number_of_edited_sites <- sapply(strsplit(Number_of_peptide_fragment_variations$all_edit_sites,','), uniqueN)
+
+write.table(Number_of_peptide_fragment_variations, file = "ForPlot-number_of_peptide_fragment_variations.txt", sep = "\t", row.names = FALSE, quote = FALSE )
+
+ggplot(data = Number_of_peptide_fragment_variations[Number_of_peptide_fragment_variations$nSamples >= 50,] , aes(x = number_of_edited_sites)) +
+  geom_histogram(color = "white", fill = "black")+
+  #scale_x_log10()+
+  scale_y_log10()+
+  xlab("Number of AtoI edit sites in each peptide")+
+  ylab("Number of peptides")+
+  theme_bw()+
+  ggtitle("Rediportal: number of A to I sites in each peptide fragment\n(filter: remove synonymous sites + found in samples >= 50)")
+}
+
 # Generate edited peptide fragments versions ---- 
+edited_fragment_versions <- list()
 generate_seq_comb <- function(seq,edited_seq){
   
   edit_peptide_pos <- unlist(gregexpr("[[:lower:]]",edited_seq))
@@ -228,13 +296,15 @@ for(a in 1:nrow(Only_edited_fragments)){
   #edited_fragment_versions <- generate_seq_comb(seq, fooseq)
   seq <- Only_edited_fragments[a,c("frag")]
   edited_seq <- Only_edited_fragments[a,c("edited_frag")]
-  frag_variations <- generate_seq_comb(seq, edited_seq)
-  inpdata <- Only_edited_fragments[a,]
   
+  frag_variations <- generate_seq_comb(seq, edited_seq)
+  
+  inpdata <- Only_edited_fragments[a,]
   #attach seq combinations to the orig. dataframe (by duplicating the orig. frame)
   combined <- cbind(inpdata, frag_variations)
   
   res[[a]] <- combined
+
   print(paste0("Generating peptide fragment variations... ", as.character(round(a*100/nrow(Only_edited_fragments),1)),"%"))
   
 }
