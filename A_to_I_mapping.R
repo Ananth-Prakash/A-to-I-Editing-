@@ -162,9 +162,10 @@ if(FASTA_TYPE == "Peptide"){
     theme_bw()+
     ggtitle("Peptide length distribution")
 }
-# Limit peptide fragment length to between 7 and 60 amino acids
+
 All_peptide_fragments_filtered <- All_peptide_fragments[All_peptide_fragments$pept_len >=7,]
-#All_peptide_fragments_filtered <- All_peptide_fragments[(All_peptide_fragments$pept_len >=7 & All_peptide_fragments$pept_len <= 60),]
+# Limit peptide fragment length to between 7 and 60 amino acids
+# All_peptide_fragments_filtered <- All_peptide_fragments[(All_peptide_fragments$pept_len >=7 & All_peptide_fragments$pept_len <= 60),]
 
 All_peptide_fragments_filtered$UniProt <- All_peptide_fragments_filtered[,c("peptide_id")]
 All_peptide_fragments_filtered$UniProt <- gsub("^tr\\||^sp\\|","",All_peptide_fragments_filtered$UniProt, perl=TRUE)
