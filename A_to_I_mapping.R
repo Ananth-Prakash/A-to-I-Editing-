@@ -163,8 +163,8 @@ if(FASTA_TYPE == "Peptide"){
     ggtitle("Peptide length distribution")
 }
 # Limit peptide fragment length to between 7 and 60 amino acids
-#All_peptide_fragments_filtered <- All_peptide_fragments[All_peptide_fragments$pept_len >=7,]
-All_peptide_fragments_filtered <- All_peptide_fragments[(All_peptide_fragments$pept_len >=7 & All_peptide_fragments$pept_len <= 60),]
+All_peptide_fragments_filtered <- All_peptide_fragments[All_peptide_fragments$pept_len >=7,]
+#All_peptide_fragments_filtered <- All_peptide_fragments[(All_peptide_fragments$pept_len >=7 & All_peptide_fragments$pept_len <= 60),]
 
 All_peptide_fragments_filtered$UniProt <- All_peptide_fragments_filtered[,c("peptide_id")]
 All_peptide_fragments_filtered$UniProt <- gsub("^tr\\||^sp\\|","",All_peptide_fragments_filtered$UniProt, perl=TRUE)
@@ -262,6 +262,12 @@ generate_seq_comb <- function(seq,edited_seq){
   #print(edit_aa)
   #print(edit_peptide_pos)
   edit_pos_combinations <- expand.grid(rep(list(0:1), no_of_edits))
+  
+  ## NOTE ############
+  #  Assumption: Chances of a peptide having more than 5 RNA edits extremely unlikely invivo
+  ### This reduces the computational number of peptide variations
+  edit_pos_combinations <- edit_pos_combinations[rowSums(edit_pos_combinations) <= 5,]
+  
   for(k in 1:ncol(edit_pos_combinations)){
     edit_pos_combinations[edit_pos_combinations[k] == 1, k] <- edit_peptide_pos[k]
     edit_aa[k,1] <- substr(edited_seq,edit_peptide_pos[k],edit_peptide_pos[k])
