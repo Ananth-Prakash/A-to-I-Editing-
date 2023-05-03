@@ -57,6 +57,7 @@ synfiltered_editsite_distribution <- filtered_editing_sites %>% count(UniProt, s
 sample_filtered_editing_sites <- filtered_editing_sites[filtered_editing_sites$nSamples >= 10,]
 samplefiltered_editsite_distribution <- sample_filtered_editing_sites %>% count(UniProt, sort = TRUE)
 
+##Plot1
 ggplot(data = synfiltered_editsite_distribution , aes(x = n)) +
   geom_histogram(color = "white", fill = "lightgreen")+
   #geom_histogram(color = "white", fill = "lightgreen", binwidth = 1)+
@@ -67,6 +68,7 @@ ggplot(data = synfiltered_editsite_distribution , aes(x = n)) +
   theme_bw()+
   ggtitle("Rediportal: number of A to I sites in each protein\n(filter: remove synonymous sites)")
 
+##Plot2
 ggplot(data = samplefiltered_editsite_distribution , aes(x = n)) +
   geom_histogram(color = "white", fill = "brown")+
   #geom_histogram(color = "white", fill = "brown", binwidth = 1)+
@@ -83,8 +85,8 @@ FASTA_TYPE <- "Peptide"
 
 
 #Read UniProt FASTA file
-fasta_file <- readAAStringSet("Human_OneProteinPerGeneSet_Sept2020_UP000005640_9606.fasta")
-#fasta_file <- readAAStringSet("TEST5_input.fasta")
+#fasta_file <- readAAStringSet("Human_OneProteinPerGeneSet_Sept2020_UP000005640_9606.fasta")
+fasta_file <- readAAStringSet("TEST6_input.fasta")
 
 fasta_seq <- as.data.frame(fasta_file)
 fasta_seq <- tibble::rownames_to_column(fasta_seq, "name")
@@ -152,6 +154,8 @@ All_peptide_fragments <- do.call(rbind, fragments)
 # Distribution of peptide fragment lengths
 if(FASTA_TYPE == "Peptide"){
   median_peptlength <- median(All_peptide_fragments$pept_len)
+
+  ##Plot3  
   ggplot(data = All_peptide_fragments , aes(x = pept_len)) +
     geom_histogram(color = "white", fill = "lightpink")+
     geom_vline(aes(xintercept = median_peptlength), color = "red", linewidth = 2)+
@@ -220,7 +224,8 @@ for(l in 1:nrow(All_peptide_fragments_filtered)){
 
 All_peptide_fragments_filtered$edited[is.na(All_peptide_fragments_filtered$edited)] <- "N"
 All_peptide_fragments_filtered$all_edit_sites <- gsub("^,","",All_peptide_fragments_filtered$all_edit_sites)
-
+All_peptide_fragments_filtered$number_of_edited_sites <- sapply(strsplit(All_peptide_fragments_filtered$all_edit_sites,','), uniqueN)
+All_peptide_fragments_filtered$number_of_edited_sites[is.na(All_peptide_fragments_filtered$all_edit_sites)] <- 0
 
 ##################################################################################################
 #### Make different versions of peptide fragments based on combinations of edited positions ######
@@ -237,6 +242,7 @@ Number_of_peptide_fragment_variations$number_of_edited_sites <- sapply(strsplit(
 
 write.table(Number_of_peptide_fragment_variations, file = "ForPlot-number_of_peptide_fragment_variations.txt", sep = "\t", row.names = FALSE, quote = FALSE )
 
+##Plot4
 ggplot(data = Number_of_peptide_fragment_variations, aes(x = number_of_edited_sites)) +
   geom_histogram(color = "white", fill = "black")+
   #scale_x_log10()+
@@ -260,15 +266,16 @@ generate_seq_comb <- function(seq,edited_seq){
   edit_aa <- data.frame()
   output <- data.frame(edited_peptide_pos=c(NA), edited_peptide_frag=c(NA))
   
-  #print(edit_aa)
-  #print(edit_peptide_pos)
   edit_pos_combinations <- expand.grid(rep(list(0:1), no_of_edits))
+  #print(edit_peptide_pos)
+  #print(edit_pos_combinations)
   
-  ## NOTE ############
-  #  Assumption: Chances of a peptide having more than 5 RNA edits extremely unlikely invivo
+  ## FILTER ############
+  #  Assumption: Chances of a peptide having more than 10 RNA edits simultaneously is extremely unlikely invivo
   ### This reduces the computational number of peptide variations
-  edit_pos_combinations <- edit_pos_combinations[rowSums(edit_pos_combinations) <= 5,]
-  
+ 
+  edit_pos_combinations <- data.frame(edit_pos_combinations[rowSums(edit_pos_combinations) <= 10,])
+
   for(k in 1:ncol(edit_pos_combinations)){
     edit_pos_combinations[edit_pos_combinations[k] == 1, k] <- edit_peptide_pos[k]
     edit_aa[k,1] <- substr(edited_seq,edit_peptide_pos[k],edit_peptide_pos[k])
@@ -302,22 +309,31 @@ for(a in 1:nrow(Only_edited_fragments)){
   #edited_fragment_versions <- generate_seq_comb(seq, fooseq)
   seq <- Only_edited_fragments[a,c("frag")]
   edited_seq <- Only_edited_fragments[a,c("edited_frag")]
-  
-  frag_variations <- generate_seq_comb(seq, edited_seq)
-  
-  inpdata <- Only_edited_fragments[a,]
-  #attach seq combinations to the orig. dataframe (by duplicating the orig. frame)
-  combined <- cbind(inpdata, frag_variations)
-  
-  res[[a]] <- combined
 
-  print(paste0("Generating peptide fragment variations... ", as.character(round(a*100/nrow(Only_edited_fragments),1)),"%"))
+  no_of_edit_sites <- Only_edited_fragments[a,c("number_of_edited_sites")]
+  print(no_of_edit_sites)
   
+  ### FILTER: Consider only peptide that have overall upto 20 edit sites on them
+  ### The more edit sites on a peptide there are more variations that will be generated 
+  ### (ex. a peptide with 25 edit sites will result in 2^25 = 33,554,432 peptide variations!)
+  ### See Plot4, this distribution shows only few peptides that in total have > 20 edit sites on them
+  ### Therefore this limit will result in loss of only few reference peptides.
+  if(no_of_edit_sites <= 20){
+    frag_variations <- generate_seq_comb(seq, edited_seq)
+  
+    inpdata <- Only_edited_fragments[a,]
+    #attach seq combinations to the orig. dataframe (by duplicating the orig. frame)
+    combined <- cbind(inpdata, frag_variations)
+  
+    res[[a]] <- combined
+
+    print(paste0("Generating peptide fragment variations... ", as.character(round(a*100/nrow(Only_edited_fragments),1)),"%"))
+  }
 }
 
 All_edited_fragment_versions <- do.call(rbind, res)
 All_edited_fragment_versions$number_of_edited_sites <- lengths(strsplit(as.character(All_edited_fragment_versions$edited_peptide_pos), ","))
-All_edited_fragment_versions$number_of_edited_sites[is.na(All_edited_fragment_versions$edited_peptide_pos)] <- NA
+All_edited_fragment_versions$number_of_edited_sites[is.na(All_edited_fragment_versions$edited_peptide_pos)] <- 0
 
 Non_edited_fragments$"edited_peptide_pos" <- NA
 Non_edited_fragments$"edited_peptide_frag" <- Non_edited_fragments$frag
@@ -325,13 +341,12 @@ Non_edited_fragments$"edited_peptide_frag" <- Non_edited_fragments$frag
 All_data <- rbind(All_edited_fragment_versions, Non_edited_fragments)
 
 All_data <- subset(All_data, select=-c(edited_frag))
-All_data$edited[All_data$edited_peptide_pos == "NA"] <- "N"
-All_data$all_edit_sites[All_data$edited_peptide_pos == "NA"] <- NA
+All_data$edited[is.na(All_data$edited_peptide_pos)] <- "N"
 
 colnames(All_data)[2] <- "peptide_fragment_with_2_missed_Trp_cleavage_sites"
 colnames(All_data)[9] <- "edit_position_on_protein_seq"
-colnames(All_data)[10] <- "edit_position_on_peptide_fragment"
-colnames(All_data)[11] <- "edited_peptide_fragment"
+colnames(All_data)[12] <- "edit_position_on_peptide_fragment"
+colnames(All_data)[13] <- "edited_peptide_fragment"
 
 All_data$peptide_id <- do.call(paste, c(All_data[c("peptide_id","edit_position_on_peptide_fragment")], sep = "_Editpos:"))
 #All_data$peptide_id <- gsub("_Editpos:NA","",All_data$peptide_id)
