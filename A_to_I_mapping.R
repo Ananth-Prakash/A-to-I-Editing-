@@ -311,7 +311,6 @@ for(a in 1:nrow(Only_edited_fragments)){
   edited_seq <- Only_edited_fragments[a,c("edited_frag")]
 
   no_of_edit_sites <- Only_edited_fragments[a,c("number_of_edited_sites")]
-  print(no_of_edit_sites)
   
   ### FILTER: Consider only peptide that have overall upto 20 edit sites on them
   ### The more edit sites on a peptide there are more variations that will be generated 
