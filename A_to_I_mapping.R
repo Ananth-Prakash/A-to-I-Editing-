@@ -85,8 +85,8 @@ FASTA_TYPE <- "Peptide"
 
 
 #Read UniProt FASTA file
-#fasta_file <- readAAStringSet("Human_OneProteinPerGeneSet_Sept2020_UP000005640_9606.fasta")
-fasta_file <- readAAStringSet("TEST6_input.fasta")
+fasta_file <- readAAStringSet("Human_OneProteinPerGeneSet_Sept2020_UP000005640_9606.fasta")
+#fasta_file <- readAAStringSet("TEST6_input.fasta")
 
 fasta_seq <- as.data.frame(fasta_file)
 fasta_seq <- tibble::rownames_to_column(fasta_seq, "name")
